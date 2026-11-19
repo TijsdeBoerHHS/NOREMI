@@ -51,6 +51,13 @@ function icon(name) {
   return s;
 }
 function objUrl(blob) { const u = URL.createObjectURL(blob); urls.push(u); return u; }
+// Foto's als data-URL (geen blob-URL): die kunnen niet 'ongeldig' worden bij hertekenen op iPad/Safari.
+const photoCache = new WeakMap();
+const toDataUrl = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(''); r.readAsDataURL(blob); });
+async function preparePhotos(list) {
+  await Promise.all(list.map(async (p) => { if (p.photo && !photoCache.has(p.photo)) photoCache.set(p.photo, await toDataUrl(p.photo)); }));
+}
+const photoSrc = (blob) => (blob && photoCache.get(blob)) || (blob ? objUrl(blob) : '');
 function revokeUrls() { urls.forEach((u) => URL.revokeObjectURL(u)); urls = []; }
 let toastTimer;
 function toast(msg) {
@@ -156,7 +163,7 @@ function startView() {
   const grid = state.persons.length
     ? h('div', { class: 'grid' }, state.persons.map((p) =>
         h('button', { class: 'card', onclick: () => go('persoon/' + p.id) },
-          h('img', { src: objUrl(p.photo), alt: '' }),
+          h('img', { src: photoSrc(p.photo), alt: '' }),
           h('span', { class: 'card-label' }, p.label))))
     : h('div', { class: 'empty' }, h('p', {}, 'Er zijn nog geen personen toegevoegd.'), h('p', {}, 'Een begeleider kan ze toevoegen via Beheer.'));
   return h('div', { class: 'screen' },
@@ -173,7 +180,7 @@ function personView(id) {
   const videoSrc = p.video ? objUrl(p.video) : p.videoUrl || null;
   const ready = demo || !!videoSrc;
 
-  const photo = h('img', { src: objUrl(p.photo), alt: p.label, draggable: 'false' });
+  const photo = h('img', { src: photoSrc(p.photo), alt: p.label, draggable: 'false' });
   const video = h('video', { playsinline: '', 'webkit-playsinline': '', preload: 'auto' });
   video.setAttribute('playsinline', '');
   const stage = h('button', { class: 'stage', 'aria-label': 'Bericht van ' + p.label + ' afspelen', onclick: toggle },
@@ -263,7 +270,7 @@ function listPanel() {
   const rows = state.persons.map((p, i) => {
     const klaar = aiMode ? !!(p.video || p.videoUrl) : true;
     return h('div', { class: 'person-row' },
-      h('img', { src: objUrl(p.photo), alt: '' }),
+      h('img', { src: photoSrc(p.photo), alt: '' }),
       h('div', { class: 'info' }, h('div', {}, h('strong', {}, p.label)),
         h('span', { class: 'chip' + (klaar ? '' : ' warn') }, aiMode ? (klaar ? 'Video klaar' : 'Video nog niet gemaakt') : 'Klaar (demo)')),
       h('button', { class: 'btn', 'aria-label': 'Omhoog', disabled: i === 0, onclick: () => move(i, -1) }, icon('up')),
@@ -375,7 +382,7 @@ function editorView() {
   const say = (msg, err) => { status.hidden = !msg; status.textContent = msg || ''; status.classList.toggle('error', !!err); };
 
   const preview = h('img', { class: 'preview', alt: '' });
-  const paintPhoto = () => { if (d.photo) preview.src = objUrl(d.photo); preview.hidden = !d.photo; };
+  const paintPhoto = () => { if (d.photo) preview.src = photoSrc(d.photo); preview.hidden = !d.photo; };
   const file = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async (e) => {
     const f = e.target.files[0]; if (!f) return;
     try { d.photo = await squareJpeg(f); paintPhoto(); } catch { say('Deze foto kan niet worden gelezen.', true); }
@@ -552,6 +559,8 @@ async function render(keepPersons) {
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   if (!keepPersons) {
     const persons = await db.getAllPersons();
+    if (token !== renderToken) return;
+    await preparePhotos(persons);
     if (token !== renderToken) return;
     state.persons = persons;
   }
