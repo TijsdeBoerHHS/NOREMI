@@ -1,5 +1,7 @@
 # NO-RE-MI – tablet-webapp (PWA), prototype
 
+https://tijsdeboerhhs.github.io/NOREMI/
+
 Pratende foto's van naasten voor mensen met dementie. Gebouwd volgens het plan van aanpak, het
 keuzeonderzoek (Azure Speech + D-ID) en het onderzoeksdocument (AVG, AI-label, geen stem van overledenen).
 
