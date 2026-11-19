@@ -251,16 +251,19 @@ function personView(id) {
           p.speech = blob; db.putPerson(p).catch(() => {}); notice.textContent = '';
           if (!playing) return;
         }
-        audioEl = new Audio(objUrl(blob)); audioEl.onended = end; await audioEl.play();
+        // Safari bewaart het bestandstype soms niet mee in de database: zonder type speelt hij niets af
+        const playable = blob.type ? blob : new Blob([blob], { type: 'audio/mp4' });
+        audioEl = new Audio(); audioEl.preload = 'auto'; audioEl.src = objUrl(playable); audioEl.onended = end;
+        await audioEl.play();
       } else if ('speechSynthesis' in window) {
-        const u = makeUtterance(p.text, p.sysVoice); u.onend = end; u.onerror = () => { end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.'; };
+        const u = makeUtterance(p.text, p.sysVoice); u.onend = end; u.onerror = (ev) => { if (!playing || ev?.error === 'canceled' || ev?.error === 'interrupted') { end(); return; } end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.'; };
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
     } catch (e) {
       // door de gebruiker gestopt tijdens het starten: play() wordt dan afgebroken, dat is geen fout
       if (!playing || e?.name === 'AbortError') { end(); return; }
       console.error('Afspelen mislukt:', e);
-      end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.';
+      end(); notice.textContent = `Het afspelen lukt niet. Vraag een begeleider om hulp.${e?.name ? ` (${e.name})` : ''}`;
     }
   }
   ui();
