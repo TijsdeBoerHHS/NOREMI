@@ -95,7 +95,8 @@ main { flex: 1; padding: .4rem 1.2rem 1rem; }
 .person-row { display: flex; align-items: center; gap: 1rem; padding: .6rem 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .person-row:first-of-type { border-top: 0; }
 .person-row img { width: 84px; height: 84px; object-fit: cover; border-radius: 14px; background: var(--soft); }
-.person-row .info { flex: 1; min-width: 220px; }
+.person-row .info { flex: 1; min-width: 0; flex-basis: 160px; overflow-wrap: anywhere; word-break: break-word; }
+.person-row .info .chip { max-width: 100%; }
 .chip { display: inline-block; padding: 0 .6rem; border-radius: 999px; background: var(--soft); color: var(--primary); font-weight: 600; }
 .chip.warn { background: #fdecd6; color: #8a4b08; }
 label.field { display: block; margin: .8rem 0; font-weight: 600; }
