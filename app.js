@@ -256,7 +256,12 @@ function personView(id) {
         audioEl = new Audio(); audioEl.preload = 'auto'; audioEl.src = objUrl(playable); audioEl.onended = end;
         await audioEl.play();
       } else if ('speechSynthesis' in window) {
-        const u = makeUtterance(p.text, p.sysVoice); u.onend = end; u.onerror = (ev) => { if (!playing || ev?.error === 'canceled' || ev?.error === 'interrupted') { end(); return; } end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.'; };
+        const u = makeUtterance(p.text, p.sysVoice); u.onend = end; u.onerror = (ev) => {
+          // Alleen echte storingen melden. Stoppen (cancel) geeft in Safari en Chrome op iPad ook een 'fout', afhankelijk van de browser met een andere code.
+          const echt = ['synthesis-failed', 'synthesis-unavailable', 'language-unavailable', 'voice-unavailable', 'text-too-long', 'invalid-argument'].includes(ev?.error);
+          const wasPlaying = playing; end();
+          if (wasPlaying && echt) notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.';
+        };
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
     } catch (e) {
