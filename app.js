@@ -380,14 +380,14 @@ function settingsPanel() {
     const n = voicesForLang(f.voice.value).length;
     voiceInfo.textContent = n
       ? `${n} ${n === 1 ? 'stem' : 'stemmen'} gevonden voor deze taal op dit apparaat. De stem zelf kiest u per persoon.`
-      : 'Geen stem gevonden voor deze taal op dit apparaat. Installeer er een in de taal- of spraakinstellingen van de tablet, of gebruik de AI-modus.';
+      : 'Geen stem gevonden voor deze taal op dit apparaat. Installeer er een in de taal- of spraakinstellingen van het systeem, of gebruik de AI-modus.';
   };
   fillVoices();
   if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = fillVoices;
   const tryVoice = () => {
     if (!('speechSynthesis' in window)) { toast('Dit apparaat heeft geen spraak.'); return; }
     state.s.systemVoice = f.voice.value; speechSynthesis.cancel(); fillVoices();
-    speechSynthesis.speak(makeUtterance('Hallo, dit is de stem van deze tablet. Ik wens je een fijne dag.'));
+    speechSynthesis.speak(makeUtterance('Hallo, dit is de systeemstem. Ik wens je een fijne dag.'));
   };
   f.mode.value = s.mode;
   f.azureVoice.value = ai.VOICES.some((v) => v.id === s.azureVoice) ? s.azureVoice : DEFAULTS.azureVoice;
@@ -405,7 +405,7 @@ function settingsPanel() {
     h('h2', {}, 'Instellingen'),
     field('Naam van de bewoner (staat rechtsboven)', f.name),
     field('Werkwijze', f.mode),
-    h('p', { class: 'hint' }, 'In AI-modus speelt de app alleen berichten af waarvan de video is gemaakt. Is die er niet, dan gebeurt er niets (zoals vastgelegd in het keuzeonderzoek). Demo gebruikt een bewegende foto zonder lipsync en geen D-ID-video. De stem komt van Azure als hieronder een sleutel is ingevuld (dan gaat de tekst ook in Demo naar Microsoft), anders van de tablet. Het keuzeonderzoek wees de bewegende foto en de systeemstem af, dus Demo is alleen een testfunctie en niet de gekozen aanpak.'),
+    h('p', { class: 'hint' }, 'In AI-modus speelt de app alleen berichten af waarvan de video is gemaakt. Is die er niet, dan gebeurt er niets (zoals vastgelegd in het keuzeonderzoek). Demo gebruikt een bewegende foto zonder lipsync en geen D-ID-video. De stem komt van Azure als hieronder een sleutel is ingevuld (dan gaat de tekst ook in Demo naar Microsoft), anders van het systeem. Het keuzeonderzoek wees de bewegende foto en de systeemstem af, dus Demo is alleen een testfunctie en niet de gekozen aanpak.'),
     field('Taal van de systeemstem (alleen voor Demo zonder Azure-sleutel)', f.voice),
     voiceInfo,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: tryVoice }, icon('play'), 'Taal beluisteren')),
@@ -618,7 +618,7 @@ function editorView() {
     h('label', { class: 'field' }, h('span', {}, 'Leeftijd (niet verplicht)'), ageInput,
       h('p', { class: 'hint' }, 'Alleen om later makkelijker de juiste stem te kiezen. Dit heeft nu geen invloed op de stem.')),
     h('div', { class: 'field' }, h('span', {}, 'Stem van deze persoon'), useSys ? sysSel : voiceSel,
-      h('p', { class: 'hint' }, useSys ? 'Kies een stem van deze tablet (bijvoorbeeld Ellen of Xander). De taal stelt u in bij Instellingen. De keuze telt niet als er een eigen opname is.' : 'Kies een vrouwen- of mannenstem. De keuze telt niet als er een eigen opname is.')),
+      h('p', { class: 'hint' }, useSys ? 'Kies een systeemstem (bijvoorbeeld Ellen of Xander). De taal stelt u in bij Instellingen. De keuze telt niet als er een eigen opname is.' : 'Kies een vrouwen- of mannenstem. De keuze telt niet als er een eigen opname is.')),
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: listen }, icon('play'), 'Beluister')),
     videoBox,
     h('label', { class: 'check' }, consent, h('span', {}, 'Ik mag deze foto en tekst gebruiken, en dit zijn geen echte persoonsgegevens (prototype).')),
