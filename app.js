@@ -41,6 +41,7 @@ const ICONS = {
   plus: '<path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/>',
   mic: '<path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3zm-5 8h2a3 3 0 006 0h2a5 5 0 01-4 4.9V19h-2v-3.1A5 5 0 017 11z"/>',
   video: '<path d="M4 6h10a2 2 0 012 2v2.5l4-2.5v8l-4-2.5V16a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>',
+  upload: '<path d="M11 16V8.8L8.4 11.4 7 10l5-5 5 5-1.4 1.4L13 8.8V16zM5 18h14v2H5z"/>',
   trash: '<path d="M9 4h6l1 2h4v2H4V6h4zm-3 6h12l-1 10H7z"/>',
   up: '<path d="M12 6l7 8H5z"/>', down: '<path d="M12 18l-7-8h14z"/>',
   edit: '<path d="M4 17.3V20h2.7L17.8 8.9l-2.7-2.7zM19.7 7l-2.7-2.7 1.4-1.4a1 1 0 011.4 0l1.3 1.3a1 1 0 010 1.4z"/>',
@@ -324,7 +325,7 @@ async function remove(p) {
 }
 function newPerson() {
   const order = state.persons.reduce((m, p) => Math.max(m, p.order), 0) + 1;
-  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', sysVoice: '', ownVideo: null, order, original: {} };
+  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', sysVoice: '', ownVideo: null, gender: '', age: '', order, original: {} };
   render();
 }
 
@@ -421,10 +422,16 @@ function editorView() {
   // eigen opname
   const audioBox = h('div', {});
   let rec = null;
+  const audioFile = h('input', { type: 'file', accept: 'audio/*', hidden: true, onchange: (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    d.audio = f; paintAudio();
+  } });
   const paintAudio = () => {
     audioBox.replaceChildren(...[
       rec ? h('button', { class: 'btn btn-danger', onclick: () => rec.stop() }, icon('stop'), 'Stop opname')
-          : h('button', { class: 'btn', onclick: startRec }, icon('mic'), d.audio ? 'Opnieuw opnemen' : 'Stem opnemen'),
+          : h('div', { class: 'row' },
+              h('button', { class: 'btn', onclick: startRec }, icon('mic'), d.audio ? 'Opnieuw opnemen' : 'Stem opnemen'),
+              h('button', { class: 'btn', onclick: () => audioFile.click() }, icon('upload'), 'Audio uploaden'), audioFile),
       d.audio && !rec ? h('audio', { controls: '', src: objUrl(d.audio), style: 'width:100%;margin-top:.6rem' }) : null,
       d.audio && !rec ? h('button', { class: 'btn', style: 'margin-top:.6rem', onclick: () => { d.audio = null; paintAudio(); } }, icon('trash'), 'Opname verwijderen') : null,
     ].filter(Boolean));
@@ -446,6 +453,10 @@ function editorView() {
   // eigen video-opname (beeld en geluid): vervangt de AI-video
   const ownBox = h('div', {});
   let vrec = null;
+  const videoFile = h('input', { type: 'file', accept: 'video/*', hidden: true, onchange: (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    d.ownVideo = f; paintOwn();
+  } });
   const liveVideo = h('video', { class: 'preview', playsinline: '', autoplay: '' });
   liveVideo.muted = true;
   const stopVideoRec = () => { if (vrec && vrec.state === 'recording') vrec.stop(); };
@@ -453,7 +464,9 @@ function editorView() {
     ownBox.replaceChildren(...[
       vrec ? liveVideo : null,
       vrec ? h('button', { class: 'btn btn-danger', onclick: stopVideoRec }, icon('stop'), 'Stop video-opname') : null,
-      !vrec ? h('button', { class: 'btn', onclick: startVideoRec }, icon('video'), d.ownVideo ? 'Video opnieuw opnemen' : 'Video opnemen') : null,
+      !vrec ? h('div', { class: 'row' },
+        h('button', { class: 'btn', onclick: startVideoRec }, icon('video'), d.ownVideo ? 'Video opnieuw opnemen' : 'Video opnemen'),
+        h('button', { class: 'btn', onclick: () => videoFile.click() }, icon('upload'), 'Video uploaden'), videoFile) : null,
       d.ownVideo && !vrec ? h('video', { class: 'preview', controls: '', playsinline: '', src: objUrl(d.ownVideo), style: 'display:block;margin-top:.6rem' }) : null,
       d.ownVideo && !vrec ? h('button', { class: 'btn', style: 'margin-top:.6rem', onclick: () => { d.ownVideo = null; paintOwn(); } }, icon('trash'), 'Video verwijderen') : null,
     ].filter(Boolean));
@@ -489,6 +502,12 @@ function editorView() {
   if (useSys && hasSpeech()) speechSynthesis.onvoiceschanged = fillSys;
   const voiceSel = h('select', { onchange: (e) => { const p = ai.PRESETS.find((x) => x.id === e.target.value); d.voice = p.voice; d.pitch = p.pitch; } }, group('Vrouw'), group('Man'));
   voiceSel.value = current.id;
+  const genderSel = h('select', { onchange: (e) => { d.gender = e.target.value; } },
+    h('option', { value: '' }, 'Niet ingevuld'), h('option', { value: 'vrouw' }, 'Vrouw'), h('option', { value: 'man' }, 'Man'), h('option', { value: 'anders' }, 'Anders'));
+  genderSel.value = d.gender || '';
+  const ageInput = h('input', { type: 'number', min: '0', max: '120', inputmode: 'numeric', placeholder: 'Bijvoorbeeld 78',
+    oninput: (e) => { d.age = e.target.value.trim(); } });
+  ageInput.value = d.age || '';
   const consent = h('input', { type: 'checkbox', checked: d.consent, onchange: (e) => { d.consent = e.target.checked; } });
 
   function validate() {
@@ -504,7 +523,7 @@ function editorView() {
     const speechChanged = d.text !== o.text || (d.voice || '') !== (o.voice || '') || (d.pitch || '') !== (o.pitch || '');
     const rec = { id: d.id, label: d.label.trim(), text: d.text.trim(), photo: d.photo, audio: d.audio || null,
       video: changed ? null : d.video || null, videoUrl: changed ? null : d.videoUrl || null, consent: true, order: d.order,
-      voice: d.voice || '', pitch: d.pitch || '', sysVoice: d.sysVoice || '', ownVideo: d.ownVideo || null, speech: speechChanged ? null : d.speech || null };
+      voice: d.voice || '', pitch: d.pitch || '', sysVoice: d.sysVoice || '', ownVideo: d.ownVideo || null, gender: d.gender || '', age: d.age || '', speech: speechChanged ? null : d.speech || null };
     await db.putPerson(rec); Object.assign(d, rec, { isNew: false, original: rec });
     return rec;
   }
@@ -559,6 +578,9 @@ function editorView() {
     h('label', { class: 'field' }, h('span', {}, 'Bericht (circa 300 tekens, 15–30 seconden)'), text, count),
     h('div', { class: 'field' }, h('span', {}, 'Eigen stem (niet verplicht)'), audioBox,
       h('p', { class: 'hint' }, 'Alleen voor een stem die iemand zelf inspreekt, bijvoorbeeld een familielid dat nog leeft. De stem van overleden personen wordt niet nagemaakt.')),
+    h('label', { class: 'field' }, h('span', {}, 'Geslacht (niet verplicht)'), genderSel),
+    h('label', { class: 'field' }, h('span', {}, 'Leeftijd (niet verplicht)'), ageInput,
+      h('p', { class: 'hint' }, 'Alleen om later makkelijker de juiste stem te kiezen. Dit heeft nu geen invloed op de stem.')),
     h('div', { class: 'field' }, h('span', {}, 'Stem van deze persoon'), useSys ? sysSel : voiceSel,
       h('p', { class: 'hint' }, useSys ? 'Kies een stem van deze tablet (bijvoorbeeld Ellen of Xander). De taal stelt u in bij Instellingen. De keuze telt niet als er een eigen opname is.' : 'Kies een vrouwen- of mannenstem. De keuze telt niet als er een eigen opname is.')),
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: listen }, icon('play'), 'Beluister')),
