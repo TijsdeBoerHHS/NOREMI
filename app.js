@@ -555,7 +555,7 @@ async function render(keepPersons) {
     if (token !== renderToken) return;
     state.persons = persons;
   }
-  revokeUrls();
+  const oldUrls = urls; urls = [];
   if (name !== 'beheer') { state.unlocked = false; state.editing = null; }
   armIdle();
   let view;
@@ -563,6 +563,7 @@ async function render(keepPersons) {
   else if (name === 'beheer') view = state.unlocked ? beheerView() : gateView();
   else view = startView();
   $app.replaceChildren(view);
+  setTimeout(() => oldUrls.forEach((u) => URL.revokeObjectURL(u)), 2000);
   if (!state.editing) window.scrollTo(0, 0);
 }
 
