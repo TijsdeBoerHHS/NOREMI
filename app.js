@@ -161,8 +161,16 @@ const voicesForLang = (lang) => {
   if (!hasSpeech()) return [];
   const base = normLang(lang).split('-')[0].toLowerCase();
   const all = speechSynthesis.getVoices().filter((v) => normLang(v.lang).toLowerCase().startsWith(base));
-  const exact = all.filter((v) => normLang(v.lang).toLowerCase() === normLang(lang).toLowerCase());
-  return exact.length ? exact : all;
+  // alle stemmen van de taal (bijv. ook Ellen uit nl-BE), de gekozen variant (nl-NL) bovenaan
+  const want = normLang(lang).toLowerCase();
+  const rank = (v) => (normLang(v.lang).toLowerCase() === want ? 0 : 1);
+  return all.map((v, i) => [v, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([v]) => v);
+};
+// bijv. ' (België)' achter de stemnaam, zodat nl-BE en nl-NL uit elkaar te houden zijn
+const regionSuffix = (l) => {
+  const r = normLang(l).split('-')[1];
+  if (!r) return '';
+  try { const n = new Intl.DisplayNames(['nl'], { type: 'region' }).of(r.toUpperCase()); return n ? ` (${n})` : ''; } catch { return ''; }
 };
 const langName = (l) => { try { return new Intl.DisplayNames(['nl'], { type: 'language', languageDisplay: 'dialect' }).of(l) || l; } catch { return l; } };
 function makeUtterance(text, voiceURI) {
@@ -232,7 +240,7 @@ function personView(id) {
     stopPlayback();
     playing = true; playback = { stop: end }; notice.textContent = ''; ui();
     try {
-      if (own || !demo) {
+      if (own || (!demo && videoSrc)) {
         video.src = videoSrc; video.currentTime = 0; video.onended = end;
         await video.play();
       } else if (p.audio || p.speech || state.s.azureKey) {
@@ -249,6 +257,7 @@ function personView(id) {
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
     } catch (e) {
+      console.error('Afspelen mislukt:', e);
       end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.';
     }
   }
@@ -442,8 +451,13 @@ function editorView() {
       const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
       const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
       const chunks = [];
-      mr.ondataavailable = (e) => chunks.push(e.data);
-      mr.onstop = () => { stream.getTracks().forEach((t) => t.stop()); clearTimeout(cut); d.audio = new Blob(chunks, { type: mr.mimeType }); rec = null; paintAudio(); };
+      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop()); clearTimeout(cut);
+        if (chunks.length) d.audio = new Blob(chunks, { type: mr.mimeType || mime || 'audio/mp4' });
+        else say('Er is niets opgenomen. Probeer het nog eens en praat minstens een paar seconden.', true);
+        rec = null; paintAudio();
+      };
       const cut = setTimeout(() => mr.state === 'recording' && mr.stop(), 45000);
       rec = mr; mr.start(); paintAudio();
     } catch { say('De microfoon is niet beschikbaar. Geef toestemming in de instellingen van de browser.', true); }
@@ -495,7 +509,7 @@ function editorView() {
   const sysSel = h('select', { onchange: (e) => { d.sysVoice = e.target.value; } });
   const fillSys = () => {
     const vs = voicesForLang(systemLang());
-    sysSel.replaceChildren(h('option', { value: '' }, 'Automatisch'), ...vs.map((v) => h('option', { value: v.voiceURI }, shortName(v.name))));
+    sysSel.replaceChildren(h('option', { value: '' }, 'Automatisch'), ...vs.map((v) => h('option', { value: v.voiceURI }, shortName(v.name) + regionSuffix(v.lang))));
     sysSel.value = vs.some((v) => v.voiceURI === d.sysVoice) ? d.sysVoice : '';
   };
   fillSys();
