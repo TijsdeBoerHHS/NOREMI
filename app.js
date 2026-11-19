@@ -279,7 +279,10 @@ function listPanel() {
 async function move(i, d) {
   const a = state.persons[i]; const b = state.persons[i + d]; if (!b) return;
   [a.order, b.order] = [b.order, a.order];
-  await db.putPerson(a); await db.putPerson(b); render();
+  // Direct in het geheugen herordenen, zodat de foto's niet opnieuw uit de database gelezen hoeven te worden.
+  state.persons.sort((x, y) => x.order - y.order);
+  render(true);
+  try { await db.putPerson(a); await db.putPerson(b); } catch (e) { toast('Opslaan van de volgorde is mislukt.'); render(); }
 }
 async function remove(p) {
   if (!(await confirmDialog(`Weet je zeker dat je “${p.label}” wilt verwijderen? Foto, tekst en video worden van deze tablet gewist. Dit kan niet ongedaan worden gemaakt.`, 'Ja, verwijderen', true))) return;
@@ -541,14 +544,18 @@ function armIdle() {
 }
 document.addEventListener('pointerdown', armIdle);
 
-async function render() {
+async function render(keepPersons) {
+  if (keepPersons !== true) keepPersons = false;
   const token = ++renderToken;
-  stopPlayback(); revokeUrls();
+  stopPlayback();
   if (location.hash !== lastHash) { $toast.classList.remove('show'); lastHash = location.hash; }
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
-  const persons = await db.getAllPersons();
-  if (token !== renderToken) return;
-  state.persons = persons;
+  if (!keepPersons) {
+    const persons = await db.getAllPersons();
+    if (token !== renderToken) return;
+    state.persons = persons;
+  }
+  revokeUrls();
   if (name !== 'beheer') { state.unlocked = false; state.editing = null; }
   armIdle();
   let view;
