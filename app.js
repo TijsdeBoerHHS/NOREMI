@@ -40,6 +40,7 @@ const ICONS = {
   lock: '<path d="M7 11V8a5 5 0 0110 0v3h1v9H6v-9zm2 0h6V8a3 3 0 00-6 0z"/>',
   plus: '<path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/>',
   mic: '<path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3zm-5 8h2a3 3 0 006 0h2a5 5 0 01-4 4.9V19h-2v-3.1A5 5 0 017 11z"/>',
+  video: '<path d="M4 6h10a2 2 0 012 2v2.5l4-2.5v8l-4-2.5V16a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>',
   trash: '<path d="M9 4h6l1 2h4v2H4V6h4zm-3 6h12l-1 10H7z"/>',
   up: '<path d="M12 6l7 8H5z"/>', down: '<path d="M12 18l-7-8h14z"/>',
   edit: '<path d="M4 17.3V20h2.7L17.8 8.9l-2.7-2.7zM19.7 7l-2.7-2.7 1.4-1.4a1 1 0 011.4 0l1.3 1.3a1 1 0 010 1.4z"/>',
@@ -452,7 +453,7 @@ function editorView() {
     ownBox.replaceChildren(...[
       vrec ? liveVideo : null,
       vrec ? h('button', { class: 'btn btn-danger', onclick: stopVideoRec }, icon('stop'), 'Stop video-opname') : null,
-      !vrec ? h('button', { class: 'btn', onclick: startVideoRec }, icon('mic'), d.ownVideo ? 'Video opnieuw opnemen' : 'Video opnemen') : null,
+      !vrec ? h('button', { class: 'btn', onclick: startVideoRec }, icon('video'), d.ownVideo ? 'Video opnieuw opnemen' : 'Video opnemen') : null,
       d.ownVideo && !vrec ? h('video', { class: 'preview', controls: '', playsinline: '', src: objUrl(d.ownVideo), style: 'display:block;margin-top:.6rem' }) : null,
       d.ownVideo && !vrec ? h('button', { class: 'btn', style: 'margin-top:.6rem', onclick: () => { d.ownVideo = null; paintOwn(); } }, icon('trash'), 'Video verwijderen') : null,
     ].filter(Boolean));
