@@ -117,6 +117,15 @@ function pinPad({ title, hint, onDone, onCancel }) {
     h('button', { class: 'btn', onclick: onCancel }, 'Terug'),
     key(0),
     h('button', { class: 'btn', onclick: () => { digits = digits.slice(0, -1); paint(); } }, 'Wis')));
+  // Toetsenbord (pc): cijfers invoeren, Backspace wist, Escape gaat terug.
+  const onKey = (e) => {
+    if (!wrap.isConnected) { document.removeEventListener('keydown', onKey); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); press(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); digits = digits.slice(0, -1); paint(); }
+    else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+  };
+  document.addEventListener('keydown', onKey);
   return wrap;
 }
 function askNewPin() {
