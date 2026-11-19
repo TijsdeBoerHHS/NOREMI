@@ -166,6 +166,16 @@ const voicesForLang = (lang) => {
   const rank = (v) => (normLang(v.lang).toLowerCase() === want ? 0 : 1);
   return all.map((v, i) => [v, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([v]) => v);
 };
+// De browser geeft geen geslacht van een stem door: dit is een lijst van bekende namen (Apple, Microsoft, Google). Onbekende namen komen onder 'onbekend'.
+const VOICE_GENDER = {
+  Vrouw: ['ellen', 'claire', 'flo', 'sandy', 'shelley', 'grandma', 'colette', 'fenna', 'femke', 'laura', 'lotte', 'zoe', 'tessa', 'sara', 'google nederlands'],
+  Man: ['xander', 'frank', 'eddy', 'reed', 'rocko', 'grandpa', 'maarten', 'pieter', 'bart', 'jan', 'arthur'],
+};
+function voiceGender(name) {
+  const n = shortName(name).toLowerCase().replace(/\s*\(.*$/, '').trim();
+  for (const [g, list] of Object.entries(VOICE_GENDER)) if (list.includes(n) || list.includes(n.split(' ')[0])) return g;
+  return null;
+}
 // bijv. ' (België)' achter de stemnaam, zodat nl-BE en nl-NL uit elkaar te houden zijn
 const regionSuffix = (l) => {
   const r = normLang(l).split('-')[1];
@@ -518,7 +528,10 @@ function editorView() {
   const sysSel = h('select', { onchange: (e) => { d.sysVoice = e.target.value; } });
   const fillSys = () => {
     const vs = voicesForLang(systemLang());
-    sysSel.replaceChildren(h('option', { value: '' }, 'Automatisch'), ...vs.map((v) => h('option', { value: v.voiceURI }, shortName(v.name) + regionSuffix(v.lang))));
+    const opt = (v) => h('option', { value: v.voiceURI }, shortName(v.name) + regionSuffix(v.lang));
+    const grp = (label, key) => { const l = vs.filter((v) => voiceGender(v.name) === key); return l.length ? h('optgroup', { label }, l.map(opt)) : null; };
+    sysSel.replaceChildren(h('option', { value: '' }, 'Automatisch'),
+      ...[grp('Vrouw', 'Vrouw'), grp('Man', 'Man'), grp('Geslacht onbekend', null)].filter(Boolean));
     sysSel.value = vs.some((v) => v.voiceURI === d.sysVoice) ? d.sysVoice : '';
   };
   fillSys();
