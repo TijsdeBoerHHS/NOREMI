@@ -62,14 +62,14 @@ main { flex: 1; padding: .4rem 1.2rem 1rem; }
 }
 .card:active { transform: scale(.98); border-color: var(--primary); }
 .card img { width: 100%; aspect-ratio: 5 / 4; object-fit: cover; border-radius: 14px; background: var(--soft); }
-.card { min-width: 0; max-width: 100%; }
-.card-label { margin-top: .5rem; font-weight: 600; min-height: 2.6em; display: flex; align-items: center; justify-content: center; max-width: 100%; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+.card { min-width: 0; max-width: 100%; overflow: hidden; }
+.card-label { display: block; box-sizing: border-box; width: 100%; margin-top: .5rem; font-weight: 600; min-height: 2.6em; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
 .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
 
 /* persoonscherm */
 .person { display: flex; flex-direction: column; align-items: center; gap: .8rem; }
 .person-top { width: 100%; display: flex; align-items: center; gap: 1rem; padding: .6rem 1.2rem; min-height: 80px; }
-.person-top h1 { letter-spacing: 0; font-size: 1.3rem; flex: 1; text-align: center; padding-right: 120px; }
+.person-top h1 { letter-spacing: 0; font-size: 1.3rem; flex: 1; min-width: 0; text-align: center; padding-right: 120px; overflow-wrap: anywhere; word-break: break-word; }
 .stage {
   font: inherit; position: relative; width: min(calc(100vh - 330px), calc(100vw - 2.4rem), 760px); width: min(calc(100dvh - 330px), calc(100vw - 2.4rem), 760px); min-width: 280px; aspect-ratio: 1; padding: 0;
   border: 3px solid var(--line); border-radius: 28px; overflow: hidden; background: #000; cursor: pointer;
