@@ -257,6 +257,8 @@ function personView(id) {
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
     } catch (e) {
+      // door de gebruiker gestopt tijdens het starten: play() wordt dan afgebroken, dat is geen fout
+      if (!playing || e?.name === 'AbortError') { end(); return; }
       console.error('Afspelen mislukt:', e);
       end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.';
     }
