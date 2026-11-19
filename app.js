@@ -142,11 +142,24 @@ function askNewPin() {
 
 /* ---------- systeemstem (alleen Demo) ---------- */
 const shortName = (n) => n.replace(/^Microsoft\s+/i, '').replace(/\s*[-–]\s*Dutch.*$/i, '').replace(/\s*\((Natural|Enhanced|Premium|Compact)\)/gi, '').replace(/\s+Online$/i, '').trim();
-const dutchVoices = () => ('speechSynthesis' in window ? speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith('nl')) : []);
-function makeUtterance(text) {
+const normLang = (l) => String(l || '').replace('_', '-');
+const hasSpeech = () => 'speechSynthesis' in window;
+// systemVoice bewaart nu alleen de taal (bijv. 'nl-NL'); oude waarden (een stem-id) vallen terug op nl-NL.
+const systemLang = () => (/^[a-z]{2,3}-[A-Za-z]{2,4}$/.test(state.s.systemVoice || '') ? state.s.systemVoice : 'nl-NL');
+const voicesForLang = (lang) => {
+  if (!hasSpeech()) return [];
+  const base = normLang(lang).split('-')[0].toLowerCase();
+  const all = speechSynthesis.getVoices().filter((v) => normLang(v.lang).toLowerCase().startsWith(base));
+  const exact = all.filter((v) => normLang(v.lang).toLowerCase() === normLang(lang).toLowerCase());
+  return exact.length ? exact : all;
+};
+const langName = (l) => { try { return new Intl.DisplayNames(['nl'], { type: 'language', languageDisplay: 'dialect' }).of(l) || l; } catch { return l; } };
+function makeUtterance(text, voiceURI) {
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'nl-NL'; u.rate = 0.85;
-  const v = dutchVoices().find((x) => x.voiceURI === state.s.systemVoice);
+  const lang = systemLang();
+  u.lang = lang; u.rate = 0.85;
+  const vs = voicesForLang(lang);
+  const v = vs.find((x) => x.voiceURI === voiceURI) || vs[0];
   if (v) { u.voice = v; u.lang = v.lang; }
   return u;
 }
@@ -220,7 +233,7 @@ function personView(id) {
         }
         audioEl = new Audio(objUrl(blob)); audioEl.onended = end; await audioEl.play();
       } else if ('speechSynthesis' in window) {
-        const u = makeUtterance(p.text); u.onend = end; u.onerror = () => { end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.'; };
+        const u = makeUtterance(p.text, p.sysVoice); u.onend = end; u.onerror = () => { end(); notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.'; };
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
     } catch (e) {
@@ -297,7 +310,7 @@ async function remove(p) {
 }
 function newPerson() {
   const order = state.persons.reduce((m, p) => Math.max(m, p.order), 0) + 1;
-  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', order, original: {} };
+  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', sysVoice: '', order, original: {} };
   render();
 }
 
@@ -316,18 +329,21 @@ function settingsPanel() {
   };
   const voiceInfo = h('p', { class: 'hint' });
   const fillVoices = () => {
-    const vs = dutchVoices();
-    f.voice.replaceChildren(h('option', { value: '' }, 'Automatisch (Nederlands)'), ...vs.map((v) => h('option', { value: v.voiceURI }, shortName(v.name))));
-    f.voice.value = vs.some((v) => v.voiceURI === state.s.systemVoice) ? state.s.systemVoice : '';
-    voiceInfo.textContent = vs.length
-      ? `${vs.length} Nederlandse ${vs.length === 1 ? 'stem' : 'stemmen'} gevonden op dit apparaat.`
-      : 'Geen Nederlandse stem gevonden op dit apparaat. Installeer er een in de taal- of spraakinstellingen van de tablet, of gebruik de AI-modus.';
+    const cur = systemLang();
+    const langs = new Set(['nl-NL', 'nl-BE', cur]);
+    if (hasSpeech()) speechSynthesis.getVoices().forEach((v) => langs.add(normLang(v.lang)));
+    f.voice.replaceChildren(...[...langs].sort().map((l) => h('option', { value: l }, langName(l))));
+    f.voice.value = cur;
+    const n = voicesForLang(f.voice.value).length;
+    voiceInfo.textContent = n
+      ? `${n} ${n === 1 ? 'stem' : 'stemmen'} gevonden voor deze taal op dit apparaat. De stem zelf kiest u per persoon.`
+      : 'Geen stem gevonden voor deze taal op dit apparaat. Installeer er een in de taal- of spraakinstellingen van de tablet, of gebruik de AI-modus.';
   };
   fillVoices();
   if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = fillVoices;
   const tryVoice = () => {
     if (!('speechSynthesis' in window)) { toast('Dit apparaat heeft geen spraak.'); return; }
-    state.s.systemVoice = f.voice.value; speechSynthesis.cancel();
+    state.s.systemVoice = f.voice.value; speechSynthesis.cancel(); fillVoices();
     speechSynthesis.speak(makeUtterance('Hallo, dit is de stem van deze tablet. Ik wens je een fijne dag.'));
   };
   f.mode.value = s.mode;
@@ -347,9 +363,9 @@ function settingsPanel() {
     field('Naam van de bewoner (staat rechtsboven)', f.name),
     field('Werkwijze', f.mode),
     h('p', { class: 'hint' }, 'In AI-modus speelt de app alleen berichten af waarvan de video is gemaakt. Is die er niet, dan gebeurt er niets (zoals vastgelegd in het keuzeonderzoek). Demo gebruikt een bewegende foto zonder lipsync en geen D-ID-video. De stem komt van Azure als hieronder een sleutel is ingevuld (dan gaat de tekst ook in Demo naar Microsoft), anders van de tablet. Het keuzeonderzoek wees de bewegende foto en de systeemstem af, dus Demo is alleen een testfunctie en niet de gekozen aanpak.'),
-    field('Systeemstem van de tablet (alleen voor Demo zonder Azure-sleutel)', f.voice),
+    field('Taal van de systeemstem (alleen voor Demo zonder Azure-sleutel)', f.voice),
     voiceInfo,
-    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: tryVoice }, icon('play'), 'Stem beluisteren')),
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: tryVoice }, icon('play'), 'Taal beluisteren')),
     field('Azure Speech – sleutel', f.azureKey),
     field('Azure – regio', f.azureRegion),
     field('Azure – standaardstem (per persoon aan te passen)', f.azureVoice),
@@ -415,6 +431,15 @@ function editorView() {
 
   const current = ai.PRESETS.find((p) => p.voice === (d.voice || state.s.azureVoice) && p.pitch === (d.pitch || '')) || ai.PRESETS[0];
   const group = (g) => h('optgroup', { label: g }, ai.PRESETS.filter((p) => p.group === g).map((p) => h('option', { value: p.id }, p.label)));
+  const useSys = demo && !state.s.azureKey;
+  const sysSel = h('select', { onchange: (e) => { d.sysVoice = e.target.value; } });
+  const fillSys = () => {
+    const vs = voicesForLang(systemLang());
+    sysSel.replaceChildren(h('option', { value: '' }, 'Automatisch'), ...vs.map((v) => h('option', { value: v.voiceURI }, shortName(v.name))));
+    sysSel.value = vs.some((v) => v.voiceURI === d.sysVoice) ? d.sysVoice : '';
+  };
+  fillSys();
+  if (useSys && hasSpeech()) speechSynthesis.onvoiceschanged = fillSys;
   const voiceSel = h('select', { onchange: (e) => { const p = ai.PRESETS.find((x) => x.id === e.target.value); d.voice = p.voice; d.pitch = p.pitch; } }, group('Vrouw'), group('Man'));
   voiceSel.value = current.id;
   const consent = h('input', { type: 'checkbox', checked: d.consent, onchange: (e) => { d.consent = e.target.checked; } });
@@ -432,7 +457,7 @@ function editorView() {
     const speechChanged = d.text !== o.text || (d.voice || '') !== (o.voice || '') || (d.pitch || '') !== (o.pitch || '');
     const rec = { id: d.id, label: d.label.trim(), text: d.text.trim(), photo: d.photo, audio: d.audio || null,
       video: changed ? null : d.video || null, videoUrl: changed ? null : d.videoUrl || null, consent: true, order: d.order,
-      voice: d.voice || '', pitch: d.pitch || '', speech: speechChanged ? null : d.speech || null };
+      voice: d.voice || '', pitch: d.pitch || '', sysVoice: d.sysVoice || '', speech: speechChanged ? null : d.speech || null };
     await db.putPerson(rec); Object.assign(d, rec, { isNew: false, original: rec });
     return rec;
   }
@@ -440,7 +465,7 @@ function editorView() {
     try {
       if (d.audio) { new Audio(objUrl(d.audio)).play(); return; }
       if (!d.text.trim()) { say('Vul eerst een tekst in.', true); return; }
-      if (demo && !state.s.azureKey) { speechSynthesis.cancel(); speechSynthesis.speak(makeUtterance(d.text)); return; }
+      if (demo && !state.s.azureKey) { speechSynthesis.cancel(); speechSynthesis.speak(makeUtterance(d.text, d.sysVoice)); return; }
       say('Stem wordt gemaakt…'); const a = await ai.azureSpeak(d.text, state.s, { voice: d.voice, pitch: d.pitch }); say(''); new Audio(objUrl(a)).play();
     } catch (e) { say(e.message, true); }
   }
@@ -482,8 +507,8 @@ function editorView() {
     h('label', { class: 'field' }, h('span', {}, 'Bericht (circa 300 tekens, 15–30 seconden)'), text, count),
     h('div', { class: 'field' }, h('span', {}, 'Eigen stem (niet verplicht)'), audioBox,
       h('p', { class: 'hint' }, 'Alleen voor een stem die iemand zelf inspreekt, bijvoorbeeld een familielid dat nog leeft. De stem van overleden personen wordt niet nagemaakt.')),
-    h('div', { class: 'field' }, h('span', {}, 'Stem van deze persoon'), voiceSel,
-      h('p', { class: 'hint' }, 'Kies een vrouwen- of mannenstem. De keuze telt niet als er een eigen opname is.')),
+    h('div', { class: 'field' }, h('span', {}, 'Stem van deze persoon'), useSys ? sysSel : voiceSel,
+      h('p', { class: 'hint' }, useSys ? 'Kies een stem van deze tablet (bijvoorbeeld Ellen of Xander). De taal stelt u in bij Instellingen. De keuze telt niet als er een eigen opname is.' : 'Kies een vrouwen- of mannenstem. De keuze telt niet als er een eigen opname is.')),
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: listen }, icon('play'), 'Beluister')),
     videoBox,
     h('label', { class: 'check' }, consent, h('span', {}, 'Ik mag deze foto en tekst gebruiken, en dit zijn geen echte persoonsgegevens (prototype).')),
