@@ -483,7 +483,7 @@ function editorView() {
 
   function validate() {
     if (!d.label.trim()) return 'Vul een bijschrift in.';
-    if (!d.photo) return 'Kies een foto.';
+    if (!d.photo) return d.ownVideo ? 'Er kon geen foto uit de video worden gehaald. Kies een foto.' : 'Kies een foto.';
     if (!d.ownVideo && !d.text.trim() && !d.audio) return 'Vul een tekst in, neem een stem op of neem een video op.';
     if (!d.consent) return 'Bevestig eerst dat deze foto en tekst gebruikt mogen worden.';
     return null;
@@ -507,6 +507,9 @@ function editorView() {
     } catch (e) { say(e.message, true); }
   }
   async function saveOnly(makeVideo) {
+    if (!d.photo && d.ownVideo) {
+      try { d.photo = await frameFromVideo(d.ownVideo); paintPhoto(); } catch { /* dan volgt de melding hieronder */ }
+    }
     const err = validate(); if (err) { say(err, true); return; }
     const rec = await persist();
     if (!makeVideo) {
@@ -542,7 +545,7 @@ function editorView() {
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => file.click() }, d.photo ? 'Andere foto kiezen' : 'Foto kiezen'), file),
       h('p', { class: 'hint' }, 'De foto wordt vierkant bijgesneden, met nadruk op het bovenste deel (gezicht). Kies een foto waarop het gezicht duidelijk en recht in beeld is.')),
     h('div', { class: 'field' }, h('span', {}, 'Eigen video-opname (niet verplicht)'), ownBox,
-      h('p', { class: 'hint' }, 'Neem een video met geluid op van de persoon zelf (maximaal 1 minuut). Is er een eigen video, dan wordt die afgespeeld in plaats van de AI-versie, zonder de melding “Gemaakt met AI”. Tekst en stem hieronder zijn dan niet nodig.')),
+      h('p', { class: 'hint' }, 'Neem een video met geluid op van de persoon zelf (maximaal 1 minuut). Is er een eigen video, dan wordt die afgespeeld in plaats van de AI-versie, zonder de melding “Gemaakt met AI”. Een foto, tekst en stem zijn dan niet nodig: als u geen foto kiest, wordt automatisch een beeld uit de video gebruikt.')),
     h('label', { class: 'field' }, h('span', {}, 'Bericht (circa 300 tekens, 15–30 seconden)'), text, count),
     h('div', { class: 'field' }, h('span', {}, 'Eigen stem (niet verplicht)'), audioBox,
       h('p', { class: 'hint' }, 'Alleen voor een stem die iemand zelf inspreekt, bijvoorbeeld een familielid dat nog leeft. De stem van overleden personen wordt niet nagemaakt.')),
@@ -556,6 +559,25 @@ function editorView() {
       h('button', { class: 'btn', onclick: () => { stopVideoRec(); state.editing = null; render(); } }, 'Annuleren'),
       h('button', { class: 'btn' + (demo ? ' btn-primary' : ''), onclick: () => saveOnly(false) }, 'Opslaan'),
       demo ? null : h('button', { class: 'btn btn-primary', onclick: () => saveOnly(true) }, 'Opslaan en video maken')));
+}
+
+/** Eerste beeld van een video -> vierkant JPEG (als er geen aparte foto is gekozen). */
+async function frameFromVideo(blob, max = 1024) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+    await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = rej; v.load(); });
+    await new Promise((res) => { v.onseeked = res; v.currentTime = Math.min(0.5, (v.duration || 1) / 2); setTimeout(res, 1500); });
+    const w = v.videoWidth, hgt = v.videoHeight; if (!w || !hgt) throw new Error('geen beeld');
+    const side = Math.min(w, hgt), sx = (w - side) / 2, sy = hgt > w ? (hgt - side) * 0.25 : 0;
+    const size = Math.min(side, max);
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    c.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, size, size);
+    const out = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.9));
+    if (!out) throw new Error('geen beeld');
+    return out;
+  } finally { URL.revokeObjectURL(url); }
 }
 
 /** Foto -> vierkant JPEG (max 1024 px), bijgesneden met nadruk op het bovenste deel. */
