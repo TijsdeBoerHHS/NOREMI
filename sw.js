@@ -1,6 +1,6 @@
 // Service worker: houdt de app-bestanden offline beschikbaar.
 // Gegevens van personen staan in IndexedDB en worden hier niet aangeraakt.
-const CACHE = 'noremi-v6';
+const CACHE = 'noremi-v7';
 const ASSETS = [
   './', './index.html', './styles.css', './app.js', './db.js', './ai.js',
   './manifest.webmanifest',

@@ -580,7 +580,8 @@ async function render(keepPersons) {
   if (keepPersons !== true) keepPersons = false;
   const token = ++renderToken;
   stopPlayback();
-  if (location.hash !== lastHash) { $toast.classList.remove('show'); lastHash = location.hash; }
+  const hashChanged = location.hash !== lastHash;
+  if (hashChanged) { $toast.classList.remove('show'); lastHash = location.hash; }
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   if (!keepPersons) {
     const persons = await db.getAllPersons();
@@ -598,7 +599,7 @@ async function render(keepPersons) {
   else view = startView();
   $app.replaceChildren(view);
   setTimeout(() => oldUrls.forEach((u) => URL.revokeObjectURL(u)), 2000);
-  if (!state.editing) window.scrollTo(0, 0);
+  if (!state.editing && hashChanged) window.scrollTo(0, 0);
 }
 
 // Voorkom per ongeluk kopiëren/delen door lang indrukken, behalve in invoervelden.
