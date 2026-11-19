@@ -190,22 +190,23 @@ function personView(id) {
   const p = state.persons.find((x) => x.id === id);
   if (!p) { go(''); return h('div'); }
   const demo = state.s.mode === 'demo';
-  const videoSrc = p.video ? objUrl(p.video) : p.videoUrl || null;
-  const ready = demo || !!videoSrc;
+  const own = !!p.ownVideo; // eigen opname van een echt persoon: geen AI
+  const videoSrc = own ? objUrl(p.ownVideo) : p.video ? objUrl(p.video) : p.videoUrl || null;
+  const ready = own || demo || !!videoSrc;
 
   const photo = h('img', { src: photoSrc(p.photo), alt: p.label, draggable: 'false' });
   const video = h('video', { playsinline: '', 'webkit-playsinline': '', preload: 'auto' });
   video.setAttribute('playsinline', '');
   const stage = h('button', { class: 'stage', 'aria-label': 'Bericht van ' + p.label + ' afspelen', onclick: toggle },
-    photo, video, h('span', { class: 'ai-badge' }, AI_LABEL));
+    photo, video, own ? null : h('span', { class: 'ai-badge' }, AI_LABEL));
   const notice = h('p', { class: 'notice' }, ready ? '' : 'Dit bericht is nog niet klaar.');
   const btn = h('button', { class: 'btn btn-primary btn-xl', onclick: toggle, disabled: !ready });
   let playing = false; let played = false; let audioEl = null;
 
   function ui() {
     btn.replaceChildren(icon(playing ? 'stop' : 'play'), playing ? 'Stoppen' : played ? 'Nog een keer' : 'Afspelen');
-    stage.classList.toggle('video-on', playing && !demo);
-    photo.classList.toggle('moving', playing && demo);
+    stage.classList.toggle('video-on', playing && (own || !demo));
+    photo.classList.toggle('moving', playing && demo && !own);
   }
   function end() {
     if (!playing) return;
@@ -220,7 +221,7 @@ function personView(id) {
     stopPlayback();
     playing = true; playback = { stop: end }; notice.textContent = ''; ui();
     try {
-      if (!demo) {
+      if (own || !demo) {
         video.src = videoSrc; video.currentTime = 0; video.onended = end;
         await video.play();
       } else if (p.audio || p.speech || state.s.azureKey) {
@@ -281,11 +282,11 @@ function beheerView() {
 function listPanel() {
   const aiMode = state.s.mode === 'ai';
   const rows = state.persons.map((p, i) => {
-    const klaar = aiMode ? !!(p.video || p.videoUrl) : true;
+    const klaar = p.ownVideo ? true : aiMode ? !!(p.video || p.videoUrl) : true;
     return h('div', { class: 'person-row' },
       h('img', { src: photoSrc(p.photo), alt: '' }),
       h('div', { class: 'info' }, h('div', {}, h('strong', {}, p.label)),
-        h('span', { class: 'chip' + (klaar ? '' : ' warn') }, aiMode ? (klaar ? 'Video klaar' : 'Video nog niet gemaakt') : 'Klaar (demo)')),
+        h('span', { class: 'chip' + (klaar ? '' : ' warn') }, p.ownVideo ? 'Eigen video' : aiMode ? (klaar ? 'Video klaar' : 'Video nog niet gemaakt') : 'Klaar (demo)')),
       h('button', { class: 'btn', 'aria-label': 'Omhoog', disabled: i === 0, onclick: () => move(i, -1) }, icon('up')),
       h('button', { class: 'btn', 'aria-label': 'Omlaag', disabled: i === state.persons.length - 1, onclick: () => move(i, 1) }, icon('down')),
       h('button', { class: 'btn', onclick: () => { state.editing = { ...p, original: p }; render(); } }, icon('edit'), 'Bewerken'),
@@ -313,7 +314,7 @@ async function remove(p) {
 }
 function newPerson() {
   const order = state.persons.reduce((m, p) => Math.max(m, p.order), 0) + 1;
-  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', sysVoice: '', order, original: {} };
+  state.editing = { id: uid(), isNew: true, label: '', text: '', photo: null, audio: null, video: null, videoUrl: null, consent: false, voice: '', pitch: '', sysVoice: '', ownVideo: null, order, original: {} };
   render();
 }
 
@@ -432,6 +433,39 @@ function editorView() {
   }
   paintAudio(); paintPhoto();
 
+  // eigen video-opname (beeld en geluid): vervangt de AI-video
+  const ownBox = h('div', {});
+  let vrec = null;
+  const liveVideo = h('video', { class: 'preview', playsinline: '', autoplay: '' });
+  liveVideo.muted = true;
+  const stopVideoRec = () => { if (vrec && vrec.state === 'recording') vrec.stop(); };
+  const paintOwn = () => {
+    ownBox.replaceChildren(...[
+      vrec ? liveVideo : null,
+      vrec ? h('button', { class: 'btn btn-danger', onclick: stopVideoRec }, icon('stop'), 'Stop video-opname') : null,
+      !vrec ? h('button', { class: 'btn', onclick: startVideoRec }, icon('mic'), d.ownVideo ? 'Video opnieuw opnemen' : 'Video opnemen') : null,
+      d.ownVideo && !vrec ? h('video', { class: 'preview', controls: '', playsinline: '', src: objUrl(d.ownVideo), style: 'display:block;margin-top:.6rem' }) : null,
+      d.ownVideo && !vrec ? h('button', { class: 'btn', style: 'margin-top:.6rem', onclick: () => { d.ownVideo = null; paintOwn(); } }, icon('trash'), 'Video verwijderen') : null,
+    ].filter(Boolean));
+  };
+  async function startVideoRec() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+      const mime = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+      const chunks = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop()); clearTimeout(cut); liveVideo.srcObject = null;
+        if (chunks.length) d.ownVideo = new Blob(chunks, { type: mr.mimeType || mime || 'video/mp4' });
+        vrec = null; paintOwn();
+      };
+      const cut = setTimeout(() => mr.state === 'recording' && mr.stop(), 60000);
+      vrec = mr; liveVideo.srcObject = stream; mr.start(); paintOwn(); liveVideo.play().catch(() => {});
+    } catch { say('De camera of microfoon is niet beschikbaar. Geef toestemming in de instellingen van de browser.', true); }
+  }
+  paintOwn();
+
   const current = ai.PRESETS.find((p) => p.voice === (d.voice || state.s.azureVoice) && p.pitch === (d.pitch || '')) || ai.PRESETS[0];
   const group = (g) => h('optgroup', { label: g }, ai.PRESETS.filter((p) => p.group === g).map((p) => h('option', { value: p.id }, p.label)));
   const useSys = demo && !state.s.azureKey;
@@ -450,7 +484,7 @@ function editorView() {
   function validate() {
     if (!d.label.trim()) return 'Vul een bijschrift in.';
     if (!d.photo) return 'Kies een foto.';
-    if (!d.text.trim() && !d.audio) return 'Vul een tekst in of neem een stem op.';
+    if (!d.ownVideo && !d.text.trim() && !d.audio) return 'Vul een tekst in, neem een stem op of neem een video op.';
     if (!d.consent) return 'Bevestig eerst dat deze foto en tekst gebruikt mogen worden.';
     return null;
   }
@@ -460,7 +494,7 @@ function editorView() {
     const speechChanged = d.text !== o.text || (d.voice || '') !== (o.voice || '') || (d.pitch || '') !== (o.pitch || '');
     const rec = { id: d.id, label: d.label.trim(), text: d.text.trim(), photo: d.photo, audio: d.audio || null,
       video: changed ? null : d.video || null, videoUrl: changed ? null : d.videoUrl || null, consent: true, order: d.order,
-      voice: d.voice || '', pitch: d.pitch || '', sysVoice: d.sysVoice || '', speech: speechChanged ? null : d.speech || null };
+      voice: d.voice || '', pitch: d.pitch || '', sysVoice: d.sysVoice || '', ownVideo: d.ownVideo || null, speech: speechChanged ? null : d.speech || null };
     await db.putPerson(rec); Object.assign(d, rec, { isNew: false, original: rec });
     return rec;
   }
@@ -476,7 +510,7 @@ function editorView() {
     const err = validate(); if (err) { say(err, true); return; }
     const rec = await persist();
     if (!makeVideo) {
-      if (demo && state.s.azureKey && !rec.audio && !rec.speech) {
+      if (demo && state.s.azureKey && !rec.ownVideo && !rec.audio && !rec.speech) {
         try {
           say('Stem wordt gemaakt…');
           rec.speech = await ai.azureSpeak(rec.text, state.s, { voice: rec.voice, pitch: rec.pitch });
@@ -507,6 +541,8 @@ function editorView() {
     h('div', { class: 'field' }, h('span', {}, 'Foto'), preview,
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => file.click() }, d.photo ? 'Andere foto kiezen' : 'Foto kiezen'), file),
       h('p', { class: 'hint' }, 'De foto wordt vierkant bijgesneden, met nadruk op het bovenste deel (gezicht). Kies een foto waarop het gezicht duidelijk en recht in beeld is.')),
+    h('div', { class: 'field' }, h('span', {}, 'Eigen video-opname (niet verplicht)'), ownBox,
+      h('p', { class: 'hint' }, 'Neem een video met geluid op van de persoon zelf (maximaal 1 minuut). Is er een eigen video, dan wordt die afgespeeld in plaats van de AI-versie, zonder de melding “Gemaakt met AI”. Tekst en stem hieronder zijn dan niet nodig.')),
     h('label', { class: 'field' }, h('span', {}, 'Bericht (circa 300 tekens, 15–30 seconden)'), text, count),
     h('div', { class: 'field' }, h('span', {}, 'Eigen stem (niet verplicht)'), audioBox,
       h('p', { class: 'hint' }, 'Alleen voor een stem die iemand zelf inspreekt, bijvoorbeeld een familielid dat nog leeft. De stem van overleden personen wordt niet nagemaakt.')),
@@ -517,7 +553,7 @@ function editorView() {
     h('label', { class: 'check' }, consent, h('span', {}, 'Ik mag deze foto en tekst gebruiken, en dit zijn geen echte persoonsgegevens (prototype).')),
     status,
     h('div', { class: 'row' },
-      h('button', { class: 'btn', onclick: () => { state.editing = null; render(); } }, 'Annuleren'),
+      h('button', { class: 'btn', onclick: () => { stopVideoRec(); state.editing = null; render(); } }, 'Annuleren'),
       h('button', { class: 'btn' + (demo ? ' btn-primary' : ''), onclick: () => saveOnly(false) }, 'Opslaan'),
       demo ? null : h('button', { class: 'btn btn-primary', onclick: () => saveOnly(true) }, 'Opslaan en video maken')));
 }
