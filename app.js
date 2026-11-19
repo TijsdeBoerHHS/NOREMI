@@ -260,7 +260,7 @@ function personView(id) {
           // Alleen echte storingen melden. Stoppen (cancel) geeft in Safari en Chrome op iPad ook een 'fout', afhankelijk van de browser met een andere code.
           const echt = ['synthesis-failed', 'synthesis-unavailable', 'language-unavailable', 'voice-unavailable', 'text-too-long', 'invalid-argument'].includes(ev?.error);
           const wasPlaying = playing; end();
-          if (wasPlaying && echt) notice.textContent = 'Het afspelen lukt niet. Vraag een begeleider om hulp.';
+          if (wasPlaying && echt) notice.textContent = `Het afspelen lukt niet. Vraag een begeleider om hulp. (systeemstem: ${ev.error})`;
         };
         speechSynthesis.speak(u);
       } else { throw new Error('Geen spraak beschikbaar op dit apparaat.'); }
@@ -268,7 +268,7 @@ function personView(id) {
       // door de gebruiker gestopt tijdens het starten: play() wordt dan afgebroken, dat is geen fout
       if (!playing || e?.name === 'AbortError') { end(); return; }
       console.error('Afspelen mislukt:', e);
-      end(); notice.textContent = `Het afspelen lukt niet. Vraag een begeleider om hulp.${e?.name ? ` (${e.name})` : ''}`;
+      end(); notice.textContent = `Het afspelen lukt niet. Vraag een begeleider om hulp.${e?.name ? ` (${own ? 'video' : p.audio || p.speech ? 'audio' : 'stem'}: ${e.name})` : ''}`;
     }
   }
   ui();
