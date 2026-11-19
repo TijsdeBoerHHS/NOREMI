@@ -305,7 +305,7 @@ function move(i, d) {
   state.persons.splice(j, 0, p);
   const ids = state.persons.map((x) => x.id);
   render(true);
-  moveQueue = moveQueue.then(() => db.setPersonOrder(ids)).catch(() => { toast('Opslaan van de volgorde is mislukt.'); });
+  moveQueue = moveQueue.then(() => db.setSetting('personOrder', ids)).catch((e) => { toast('Opslaan van de volgorde is mislukt: ' + (e && e.message ? e.message : e)); });
 }
 async function remove(p) {
   if (!(await confirmDialog(`Weet je zeker dat je “${p.label}” wilt verwijderen? Foto, tekst en video worden van deze tablet gewist. Dit kan niet ongedaan worden gemaakt.`, 'Ja, verwijderen', true))) return;
@@ -588,6 +588,16 @@ async function render(keepPersons) {
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   if (!keepPersons) {
     const persons = await db.getAllPersons();
+    try {
+      const ids = (await db.getSetting('personOrder', [])) || [];
+      const pos = new Map(ids.map((id, i) => [id, i]));
+      persons.sort((x, y) => {
+        const px = pos.has(x.id), py = pos.has(y.id);
+        if (px && py) return pos.get(x.id) - pos.get(y.id);
+        if (px !== py) return px ? -1 : 1;
+        return x.order - y.order;
+      });
+    } catch { /* terugvallen op order */ }
     if (token !== renderToken) return;
     await preparePhotos(persons);
     if (token !== renderToken) return;
