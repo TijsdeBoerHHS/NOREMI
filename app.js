@@ -296,13 +296,16 @@ function listPanel() {
     state.persons.length ? rows : h('p', { class: 'hint' }, 'Nog geen personen. Voeg er een toe, of laad voorbeeldpersonen onder Instellingen.'),
     h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', onclick: newPerson }, icon('plus'), 'Persoon toevoegen')));
 }
-async function move(i, d) {
-  const a = state.persons[i]; const b = state.persons[i + d]; if (!b) return;
-  [a.order, b.order] = [b.order, a.order];
-  // Direct in het geheugen herordenen, zodat de foto's niet opnieuw uit de database gelezen hoeven te worden.
-  state.persons.sort((x, y) => x.order - y.order);
+let moveQueue = Promise.resolve();
+function move(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= state.persons.length) return;
+  // Direct in het geheugen herordenen (foto's blijven dezelfde), daarna alleen de lijst met id's opslaan.
+  const [p] = state.persons.splice(i, 1);
+  state.persons.splice(j, 0, p);
+  const ids = state.persons.map((x) => x.id);
   render(true);
-  try { await db.putPerson(a); await db.putPerson(b); } catch (e) { toast('Opslaan van de volgorde is mislukt.'); render(); }
+  moveQueue = moveQueue.then(() => db.setPersonOrder(ids)).catch(() => { toast('Opslaan van de volgorde is mislukt.'); });
 }
 async function remove(p) {
   if (!(await confirmDialog(`Weet je zeker dat je “${p.label}” wilt verwijderen? Foto, tekst en video worden van deze tablet gewist. Dit kan niet ongedaan worden gemaakt.`, 'Ja, verwijderen', true))) return;

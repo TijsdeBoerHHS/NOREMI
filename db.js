@@ -31,8 +31,20 @@ function tx(store, mode, fn) {
   }));
 }
 
-export const getAllPersons = () =>
-  tx('persons', 'readonly', (s) => s.getAll()).then((a) => a.sort((x, y) => x.order - y.order));
+// De volgorde staat los van de personen (alleen een lijst met id's), zodat verschuiven geen foto's/video's hoeft te herschrijven.
+export const getAllPersons = async () => {
+  const a = await tx('persons', 'readonly', (s) => s.getAll());
+  let ids = [];
+  try { ids = (await getSetting('personOrder', [])) || []; } catch { /* terugvallen op order */ }
+  const pos = new Map(ids.map((id, i) => [id, i]));
+  return a.sort((x, y) => {
+    const px = pos.has(x.id), py = pos.has(y.id);
+    if (px && py) return pos.get(x.id) - pos.get(y.id);
+    if (px !== py) return px ? -1 : 1;
+    return x.order - y.order;
+  });
+};
+export const setPersonOrder = (ids) => setSetting('personOrder', ids);
 export const putPerson = (p) => tx('persons', 'readwrite', (s) => s.put(p));
 export const deletePerson = (id) => tx('persons', 'readwrite', (s) => s.delete(id));
 
