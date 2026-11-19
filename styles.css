@@ -62,7 +62,8 @@ main { flex: 1; padding: .4rem 1.2rem 1rem; }
 }
 .card:active { transform: scale(.98); border-color: var(--primary); }
 .card img { width: 100%; aspect-ratio: 5 / 4; object-fit: cover; border-radius: 14px; background: var(--soft); }
-.card-label { margin-top: .5rem; font-weight: 600; min-height: 2.6em; display: flex; align-items: center; justify-content: center; }
+.card { min-width: 0; max-width: 100%; }
+.card-label { margin-top: .5rem; font-weight: 600; min-height: 2.6em; display: flex; align-items: center; justify-content: center; max-width: 100%; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
 
 /* persoonscherm */
