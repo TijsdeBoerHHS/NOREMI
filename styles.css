@@ -36,7 +36,8 @@ p { margin: .4rem 0; }
 .top { min-height: 80px; }
 .foot { min-height: 76px; color: var(--muted); }
 .logo { color: var(--primary); }
-.patient { font-size: 1.2rem; font-weight: 600; }
+.patient { font-size: 1.2rem; font-weight: 600; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logo { flex-shrink: 0; }
 main { flex: 1; padding: .4rem 1.2rem 1rem; }
 
 /* knoppen */
