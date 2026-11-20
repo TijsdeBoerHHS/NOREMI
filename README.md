@@ -36,16 +36,9 @@ is de pincode 30 seconden geblokkeerd.
 
 Per persoon kies je in de editor een Nederlandse stem: Fenna of Colette (vrouw) of Maarten (man). Azure heeft voor nl-NL alleen deze drie.
 
-Een eigen opgenomen stem (van iemand die nog leeft) gaat in plaats van de Azure-stem naar D-ID (omgezet naar WAV).
+Een eigen opgenomen stem gaat in plaats van de Azure-stem naar D-ID (omgezet naar WAV).
 
-## Eisen uit het plan van aanpak
-
-- Tekst minimaal 20 pt: basisgrootte 27 px (= 20 pt), niets kleiner.
-- Knoppen minimaal 44 pt: minimaal 60 px hoog en breed.
-- Patiënt kan niets wijzigen of wissen: alleen Start en Persoon zijn zonder pincode bereikbaar; lang indrukken, zoomen en
-  verslepen zijn uitgezet.
-- AI-label op elk bericht; toestemmingsvinkje per persoon; waarschuwing dat foto en tekst naar Microsoft en D-ID gaan.
-- Lokale opslag (IndexedDB) van personen, foto's, tekst, opgenomen stem en video's. Geen accounts, geen backend.
+Een eigen opgenimen video gaat in plaats van beide AI
 
 ## Bestanden
 
@@ -54,8 +47,4 @@ Een eigen opgenomen stem (van iemand die nog leeft) gaat in plaats van de Azure-
 
 ## Beperkingen
 
-- De koppelingen met Azure en D-ID zijn getest met nagebootste antwoorden, **niet met echte sleutels**. Een echte proefrun
-  is nodig. Mogelijke haken: CORS bij D-ID of het ophalen van het eindbestand (dan bewaart de app het adres, dat na een dag verloopt).
 - API-sleutels staan in de lokale opslag van de tablet. Voor een echte inzet is een backend nodig.
-- De voorbeeldportretten zijn getekende silhouetten; D-ID herkent daarop geen gezicht. Gebruik voor echte tests een foto met een duidelijk gezicht.
-- Getest in Chromium; nog niet op een echte iPad met Safari (opnemen en spraak kunnen daar afwijken).
